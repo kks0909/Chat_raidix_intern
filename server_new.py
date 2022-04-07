@@ -84,17 +84,17 @@ def handle_client(nickname):
 			msg = client.recv(MAX_LEN)
 			print(f'MSG: {msg}')
 			# Расшифровываем только длину байт, отведенную под тег
-			reason = msg[:len_header_b].decode(FORMAT)
-			print(f'REason: {reason}')
-			if reason in [MSG_tag, MSG_BIG_tag]:
+			header = msg[:len_header_b].decode(FORMAT)
+			print(f'REason: {header}')
+			if header in [MSG_tag, MSG_BIG_tag, MSG_CONTROL]:
 				destination_client = msg[len_header_b: msg.find(SEP.encode(FORMAT))].decode(FORMAT)
 				print(destination_client)
 				send(msg, destination_client)
-			elif reason == SERVICE:
-				if reason == 'help':
+			elif header == SERVICE:
+				if header == 'help':
 					# Todo: блок help
 					pass
-				elif reason == 'users':
+				elif header == 'users':
 					# TODO: send list of users
 					pass
 			else:

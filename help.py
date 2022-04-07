@@ -5,25 +5,29 @@ PORT = 5050
 FORMAT = 'UTF-8'
 
 # Хедеры: с чего может начинаться сообщение
-MSG_tag = '<MSG____>'
-MSG_BIG_tag = '<MSGBIG_>'
-SERVICE = '<SERVICE>'
-headers = [MSG_tag, MSG_BIG_tag, SERVICE]
+MSG_tag = '<MSG_____>'
+MSG_BIG_tag = '<MSGBIG__>'
+SERVICE = '<SERVICE_>'
+MSG_CONTROL = '<MSGCONTR>'
+headers = [MSG_tag, MSG_BIG_tag, SERVICE, MSG_CONTROL]
 len_header = len(max(headers, key=len))
 len_header_b = len_header * len('A'.encode(FORMAT))
 
 
 # Теги, которые могут следовать за заголовком SERVICE
-NICK = '<NICKNAME___>'
-NICK_REQUEST = '<NICK_REQ___>'
-NICK_ERROR = '<NICK_ERROR_>'
-NICK_REQUEST_REP = '<NICK_AGAIN_>'
-NICK_APPROVED = '<NICK_ACCEPT>'
-ADD = '<ADD________>'
-REMOVE = '<REMOVE_____>'
-USERS = '<USERS______>'
-service_tags = [NICK, NICK_REQUEST, NICK_ERROR, NICK_REQUEST_REP, NICK_APPROVED, ADD, REMOVE, USERS]
-len_tag = len(max(service_tags, key=len))
+NICK = '<NICKNAME>'
+NICK_REQUEST = '<NICK_REQ>'
+NICK_ERROR = '<NICK_ERR>'
+NICK_REQUEST_REP = '<NICK_REP>'
+NICK_APPROVED = '<NICK_ACC>'
+ADD = '<ADD_____>'
+REMOVE = '<REMOVE__>'
+USERS = '<USERS___>'
+MSG_Y = '<MSG_YES_>'
+MSG_N = '<MSG_NOPE>'
+
+tags = [NICK, NICK_REQUEST, NICK_ERROR, NICK_REQUEST_REP, NICK_APPROVED, ADD, REMOVE, USERS, MSG_Y, MSG_N]
+len_tag = len(max(tags, key=len))
 len_tag_b = len_tag * len('A'.encode(FORMAT))
 
 

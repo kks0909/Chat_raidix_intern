@@ -23,18 +23,21 @@ def send():
 		elif text == 'Users':
 			# Todo: Запросить у сервера список пользователей
 			pass
-		elif text in service_tags:
+		elif text in tags:
 			print('Вы не можете отправить такое сообщение')
 		elif text in users:
 			destination = text
 			text_en = input('Введите сообщение\n').encode(FORMAT)
-			service_prefix = f'{MSG_tag}{destination}{SEP}{nickname}{SEP}'.encode(FORMAT)
+			service_prefix = f'{MSG_tag}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}'.encode(FORMAT)
 			try:
 				if len(text_en) < MAX_LEN - len(service_prefix):
 					print('Отправляем что-то небольшое')
-					client.send(service_prefix + text_en)
+					if client.send(service_prefix + text_en) == len(service_prefix) + len(text_en):
+						print('Сообщение отправлено')
+					else:
+						print('Ошибка при отправке')
 				else:
-					send_smth_big(f'{MSG_BIG_tag}{destination}{SEP}{nickname}{SEP}', text_en)
+					send_smth_big(f'{MSG_BIG_tag}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}', text_en)
 			except:
 				# Todo: исправить
 				print('За такое убивают.')
@@ -60,6 +63,7 @@ def send_smth_big(service_prefix, text_en):
 
 	# Контролируем количество отправленных байт
 	if bytes_send != len(text_en) + len(service_prefix) * (len(text_en) // MAX_LEN + 1):
+		print('Ошибка при отправке.')
 		print('Повторная отправка.')
 		send_smth_big(service_prefix, text_en)
 
@@ -78,27 +82,33 @@ def receive():
 			# Начинается с системного сообщения
 			if header == SERVICE:
 				# Смотрим, что следует за SERVICE
-				reason = msg[len_header_b: len_header_b + len_tag_b].decode(FORMAT)
-				print('Reason'+reason)
-				if reason == ADD:
+				tag = msg[len_header_b: len_header_b + len_tag_b].decode(FORMAT)
+				print('Tag'+tag)
+				if tag == ADD:
 					new_user = msg[len_header_b + len_tag_b:].decode(FORMAT)
 					users.append(new_user)
 					print(f'Новый клиент подключился: {new_user}')
-				elif reason == REMOVE:
+				elif tag == REMOVE:
 					rem_user = msg[len_header_b + len_tag_b:].decode(FORMAT)
 					users.remove(rem_user)
 					print(f'Клиент отключился: {rem_user}')
-				elif reason == USERS:
+				elif tag == USERS:
 					get_users(msg)
 				else:
 					print(f'Получено сообщение с пометкой системное, не удалось обработать:\n{msg}')
-			# Начинается с тега сообщения
+			# Имеет хедер сообщения
 			elif header == MSG_tag:
-				# Структура сообщения: <MSG>dest_addr<SEP>sender_addr<SEP>text
+				# Структура сообщения: <MSG>dest_addr<SEP>sender_addr<SEP>len_text_b<SEP>text
 				msg = msg.decode(FORMAT)
-				destination, sender, text = msg[len(f'{MSG_tag}'):].split(SEP, 2)
-				print(f'Получено сообщение от {sender}:\n{text}')
-				# TODO: а теперь вернуть подтверждение отправителю
+				destination, sender, len_text_b, text = msg[len_header:].split(SEP, 3)
+				if len(text.encode(FORMAT)) == int(len_text_b):
+					print(f'Получено сообщение от {sender}:\n{text}')
+					# TODO: а теперь вернуть подтверждение отправителю
+					client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_Y}{SEP}{len_text_b}'.encode(FORMAT))
+				else:
+					print(f'Получено битое сообщение от {sender}. Попытка расшифровать:\n{text}')
+					client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
+			# 		todo: а теперь отправить сообщение о неполучении
 			elif header == MSG_BIG_tag:
 				# Структура сообщения: <MSG_BIG_tag>dest_addr<SEP>sender_addr<SEP>text_part
 				destination, sender, text = msg[len_header_b:].split(SEP.encode(FORMAT), 2)
@@ -121,7 +131,17 @@ def receive():
 						print(f'Не получено большое сообщение от {sender.decode(FORMAT)}.')
 						break
 
-				# TODO: а теперь вернуть подтверждение отправителю
+				# TODO: а теперь принять подтверждение
+				# TODO: потеря сообщения не обрабатывается
+			# 	f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'
+			elif header == MSG_CONTROL:
+				msg = msg.decode(FORMAT)
+				tag, len_text_b = msg[len_header:].split(SEP)[1:]
+				if tag == MSG_Y:
+					print('Ваше сообщение доставлено')
+				elif tag == MSG_N:
+					print('Ваше сообщение частично не доставлено')
+
 			else:
 				print(f'Получено что-то странное: {msg}')
 				raise Exception

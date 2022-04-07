@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+import os
+import signal
 import socket
+import sys
 import threading
 from math import floor
-from help import *
 
+from help import *
 
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
@@ -16,32 +19,26 @@ nickname = ''
 
 def send():
 	while True:
-		text = input('Введите команду или адресата.\n')
+		text = input('Введите команду или адресата:\n')
 		if text == 'Help':
 			# Todo: показать справку
 			pass
 		elif text == 'Users':
 			# Todo: Запросить у сервера список пользователей
-			pass
+			client.send(f'{SERVICE}{USERS}'.encode(FORMAT))
 		elif text in tags:
 			print('Вы не можете отправить такое сообщение')
 		elif text in users:
 			destination = text
 			text_en = input('Введите сообщение\n').encode(FORMAT)
 			service_prefix = f'{MSG_tag}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}'.encode(FORMAT)
-			try:
-				if len(text_en) < MAX_LEN - len(service_prefix):
-					print('Отправляем что-то небольшое')
-					if client.send(service_prefix + text_en) == len(service_prefix) + len(text_en):
-						print('Сообщение отправлено')
-					else:
-						print('Ошибка при отправке')
+			if len(text_en) < MAX_LEN - len(service_prefix):
+				if client.send(service_prefix + text_en) == len(service_prefix) + len(text_en):
+					print('Сообщение отправлено')
 				else:
-					send_smth_big(f'{MSG_BIG_tag}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}', text_en)
-			except:
-				# Todo: исправить
-				print('За такое убивают.')
-				pass
+					print('Ошибка при отправке сообщения')
+			else:
+				send_smth_big(f'{MSG_BIG_tag}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}', text_en)
 		else:
 			print('Такого пользователя или команды не существует.')
 
@@ -63,8 +60,7 @@ def send_smth_big(service_prefix, text_en):
 
 	# Контролируем количество отправленных байт
 	if bytes_send != len(text_en) + len(service_prefix) * (len(text_en) // MAX_LEN + 1):
-		print('Ошибка при отправке.')
-		print('Повторная отправка.')
+		print('Ошибка при отправке.\nПовторная отправка.')
 		send_smth_big(service_prefix, text_en)
 
 
@@ -75,25 +71,25 @@ def receive():
 	while True:
 		try:
 			msg = client.recv(MAX_LEN)
-			print(f'Сообзеньице: {msg}\n')
 			# Расшифровываем только длину байт, отведенную под тег
 			header = msg[:len_header_b].decode(FORMAT)
-			print(header)
 			# Начинается с системного сообщения
 			if header == SERVICE:
 				# Смотрим, что следует за SERVICE
 				tag = msg[len_header_b: len_header_b + len_tag_b].decode(FORMAT)
-				print('Tag'+tag)
 				if tag == ADD:
 					new_user = msg[len_header_b + len_tag_b:].decode(FORMAT)
 					users.append(new_user)
-					print(f'Новый клиент подключился: {new_user}')
+					print(f'Подключился новый клиент: {new_user}')
 				elif tag == REMOVE:
 					rem_user = msg[len_header_b + len_tag_b:].decode(FORMAT)
 					users.remove(rem_user)
 					print(f'Клиент отключился: {rem_user}')
 				elif tag == USERS:
-					get_users(msg)
+					get_users(msg.decode(FORMAT))
+				elif tag == DISCONNECT:
+					print('Вы были отключены')
+					shutdown()
 				else:
 					print(f'Получено сообщение с пометкой системное, не удалось обработать:\n{msg}')
 			# Имеет хедер сообщения
@@ -103,37 +99,36 @@ def receive():
 				destination, sender, len_text_b, text = msg[len_header:].split(SEP, 3)
 				if len(text.encode(FORMAT)) == int(len_text_b):
 					print(f'Получено сообщение от {sender}:\n{text}')
-					# TODO: а теперь вернуть подтверждение отправителю
 					client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_Y}{SEP}{len_text_b}'.encode(FORMAT))
 				else:
 					print(f'Получено битое сообщение от {sender}. Попытка расшифровать:\n{text}')
 					client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
-			# 		todo: а теперь отправить сообщение о неполучении
 			elif header == MSG_BIG_tag:
 				# Структура сообщения: <MSG_BIG_tag>dest_addr<SEP>sender_addr<SEP>text_part
-				destination, sender, text = msg[len_header_b:].split(SEP.encode(FORMAT), 2)
-				# destination, sender = destination.decode(FORMAT), sender.decode(FORMAT)
+				destination, sender, len_text_b, text_en = msg[len_header_b:].split(SEP.encode(FORMAT), 3)
+				destination, sender, len_text_b = [item.decode(FORMAT) for item in [destination, sender, len_text_b]]
 				while True:
 					msg = client.recv(MAX_LEN)
-					print(f'Новое длинное сообщеньице: {msg}')
-					new_destination, new_sender, new_text = msg[len_header_b:].split(SEP.encode(FORMAT), 2)
-					if new_destination == destination and new_sender == sender:
-						print(len(text))
-						if not new_text.endswith(MSG_BIG_END_flag.encode(FORMAT)):
-							text += new_text
-							print('q')
+					new_destination, new_sender, new_len_text_b, new_text_en = msg[len_header_b:].split(SEP.encode(FORMAT), 3)
+					new_destination, new_sender, new_len_text_b = [item.decode(FORMAT) for item in [new_destination, new_sender, new_len_text_b]]
+					if new_destination == destination and new_sender == sender and new_len_text_b == len_text_b:
+						if not new_text_en.endswith(MSG_BIG_END_flag.encode(FORMAT)):
+							text_en += new_text_en
 						else:
-							text += new_text[:-len(MSG_BIG_END_flag)]
-							print('w')
-							print(f'Получено большое сообщение от {sender.decode(FORMAT)}:\n{text.decode(FORMAT)}')
+							text_en += new_text_en[:-len(MSG_BIG_END_flag)]
+							if len(text_en) == int(len_text_b):
+								print(f'Получено большое сообщение от {sender}:\n{text_en.decode(FORMAT)}')
+								client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_Y}{SEP}{len_text_b}'.encode(FORMAT))
+							else:
+								print(f'Получено битое сообщение от {sender}.\n {len(text_en)}{len_text_b}')
+								client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
 							break
 					else:
-						print(f'Не получено большое сообщение от {sender.decode(FORMAT)}.')
+						print(f'Не получено большое сообщение от {sender}.')
+						client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
 						break
 
-				# TODO: а теперь принять подтверждение
 				# TODO: потеря сообщения не обрабатывается
-			# 	f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'
 			elif header == MSG_CONTROL:
 				msg = msg.decode(FORMAT)
 				tag, len_text_b = msg[len_header:].split(SEP)[1:]
@@ -145,16 +140,15 @@ def receive():
 			else:
 				print(f'Получено что-то странное: {msg}')
 				raise Exception
+			show_info_text()
 		except:
 			print('Ошибка при получении')
-			client.close()
-			break
-	client.close()
+			shutdown()
 
 
 def get_users(msg):
 	print(f'Получаем список пользователей...')
-	users_raw = msg[len_header_b + len_tag_b:]
+	users_raw = msg[len_header + len_tag:]
 	users_raw = users_raw.split(SEP)
 	global users
 	for user_raw in users_raw:
@@ -173,6 +167,10 @@ def service_send(tag, *msg):
 	client.send(f'{SERVICE}{tag}{"".join(msg)}'.encode(FORMAT))
 
 
+def show_info_text():
+	print('Введите команду или адресата:\n')
+
+
 def welcome():
 	"""
 	Вызывается только при подключении.
@@ -185,12 +183,9 @@ def welcome():
 		try:
 			msg = client.recv(MAX_LEN).decode(FORMAT)
 			header = msg[:len_header]
-			print(f'{msg}\n')
-			print(header)
 			if header == SERVICE:
 				# Смотрим, что следует за SERVICE
 				reason = msg[len_header: len_header + len_tag]
-				print(reason)
 				if reason == NICK_REQUEST:
 					nickname = input(f'Введите свой псевдоним (не больше {floor(max_nickname_b / len("A".encode(FORMAT)))} символов): ')
 					nickname_b = len(nickname.encode(FORMAT))
@@ -210,28 +205,43 @@ def welcome():
 				elif reason == USERS:
 					get_users(msg)
 					accepted = True
+					return
 			# 	else:
 			# 		print(f'Ну чет странное: {msg}\n')
 			# else:
 			# 	print(f'Ну чет очень странное: {msg}\n')
 		except:
 			print('Ошибка при задании псевдонима')
-			client.close()
-			return False
-	return True
+			shutdown()
+	return
+
+
+def shutdown():
+	client.close()
+	print('Завершение работы')
+	os.kill(os.getpid(), signal.SIGINT)
+	sys.exit()
 
 
 def start():
-	if welcome():
-		print('Готово к работе.')
-		# Starting Threads For Listening And Writing
+	try:
+		welcome_thread = threading.Thread(target=welcome)
+		welcome_thread.start()
+		welcome_thread.join()
+
 		receive_thread = threading.Thread(target=receive)
 		receive_thread.start()
 
 		write_thread = threading.Thread(target=send)
 		write_thread.start()
-	else:
+	except:
 		print('Все плохо')
+		shutdown()
 
 
-start()
+if __name__ == '__main__':
+	try:
+		print('[STARTING]')
+		start()
+	except KeyboardInterrupt:
+		shutdown()

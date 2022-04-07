@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
+import os
+import signal
 import socket
 import sys
 import threading
+
 from help import *
+
 # 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
 
 
@@ -13,12 +17,26 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(ADDR)
 
 connections = {}
+connections_temp = []
 
 
 def remove_client(nickname):
-	connections.get(nickname).close()
-	connections.pop(nickname)
-	broadcast(REMOVE, nickname, nickname)
+	if nickname in connections:
+		print(f'[DELETE CONNECTION] {connections.get(nickname).getpeername()} {nickname}')
+		try:
+			service_send(DISCONNECT, nickname)
+		finally:
+			connections.get(nickname).close()
+			connections.pop(nickname)
+			broadcast(REMOVE, nickname, nickname)
+	elif type(nickname) is socket.socket:
+		print(f'[DELETE CONNECTION] {nickname}')
+		try:
+			service_send(DISCONNECT, nickname)
+		finally:
+			nickname.close()
+			connections_temp.remove(nickname)
+
 	# f'{nickname}' отключилсяя
 
 
@@ -41,6 +59,7 @@ def send(msg, destination_client):
 
 
 def service_send(reason, destination_client, *info):
+	print('СЕРВИС')
 	if destination_client in connections:
 		destination_client = connections.get(destination_client)
 	elif type(destination_client) is not socket.socket:
@@ -58,18 +77,6 @@ def service_send(reason, destination_client, *info):
 		if destination_client.sendall(msg) is not None:
 			# Если произошла ошибка при отправке или отправилось не все, то повторить отправку
 			service_send(reason, destination_client, *info)
-		# # Если все-таки требуется отправить что-то большое, что не влезает в стандартный лимит
-		# # Считаем, сколько информации можно отправить, создаем генератор для отправки кусочков
-		# bytes_send = 0
-		# service_prefix = f'{SERVICE}{reason}{PART}'.encode(FORMAT)
-		# max_len_info = MAX_LEN - len(service_prefix)
-		# info_text = ''.join(info).encode(FORMAT)
-		# info_pieces = (info_text[i: i + max_len_info] for i in range(0, len(info_text), max_len_info))
-		# for info_piece in info_pieces:
-		# 	bytes_send += destination_client.send(service_prefix, info_piece)
-		# # Контролируем количество отправленных байт
-		# if bytes_send != len(info_text) + len(service_prefix) * (len(info_text) // MAX_LEN + 1):
-		# 	service_send(reason, destination_client, *info)
 
 
 def handle_client(nickname):
@@ -79,7 +86,6 @@ def handle_client(nickname):
 	# send_connected_users(nickname)
 	while True:
 		try:
-			# TODO: возможность передавать большой объем
 			# Структура: <MSG_BIG_tag>dest_addr<SEP>sender_addr<SEP>text_part
 			msg = client.recv(MAX_LEN)
 			print(f'MSG: {msg}')
@@ -91,23 +97,25 @@ def handle_client(nickname):
 				print(destination_client)
 				send(msg, destination_client)
 			elif header == SERVICE:
-				if header == 'help':
+				tag = msg[len_header_b: len_header_b + len_tag_b].decode(FORMAT)
+				if tag == 'help':
 					# Todo: блок help
 					pass
-				elif header == 'users':
-					# TODO: send list of users
-					pass
+				elif tag == USERS:
+					send_connected_users(nickname)
+				else:
+					raise Exception
 			else:
 				raise Exception
 		except:
 			print(f'Сервер получил что-то странное от пользователя {nickname}: {msg.decode(FORMAT)}')
-			print(f'[DELETE CONNECTION] {client.getpeername()} {nickname}')
 			remove_client(nickname)
 			break
 	client.close()
 
 
 def send_connected_users(nickname):
+	print('по')
 	service_send(USERS, nickname, f'{SEP}'.join(connections))
 
 
@@ -143,7 +151,6 @@ def welcome(conn):
 		# Добиваемся от пользователя псевдонима да так, чтоб он был уникальным
 		service_send(NICK_REQUEST, conn)
 		print(f'Запрос ника у {conn.getpeername()}')
-		# TODO: MAX_LEN или не на ник?
 		tag, nickname = receive()
 		while connections.get(nickname) is not None:
 			service_send(NICK_REQUEST_REP, conn)
@@ -160,23 +167,16 @@ def welcome(conn):
 
 		connections.update({nickname: conn})
 		print(f'Подключенные пользователи: {", ".join(connections)}')
+		connections_temp.remove(conn)
 
 		handle_client(nickname)
-		# client_thread = threading.Thread(target=handle_client, args=(nickname,), name=nickname)
-		# client_thread.start()
-		# print(f'[ACTIVE CONNECTIONS] {threading.active_count() - 2}; {threading.current_thread()}\n')
 	except:
 		print(f'Ошибка во время подключения {conn.getpeername()}')
 		print(f'[DELETE CONNECTION] {conn.getpeername()} {nickname}')
 		if connections.get(nickname) is not None:
 			remove_client(nickname)
 		else:
-			conn.close()
-			return
-
-
-# print(type(nickname))
-# print(connections)
+			remove_client(conn)
 
 
 def listening():
@@ -184,19 +184,22 @@ def listening():
 	print(f'[LISTENING] server listening {SERVER}')
 	while True:
 		conn, address = server.accept()
+		connections_temp.append(conn)
 
-		welcome_thread = threading.Thread(target=welcome, args=(conn,))
-		welcome_thread.start()
+		client_thread = threading.Thread(target=welcome, args=(conn,))
+		client_thread.start()
 
-#
-# print('[STARTING]')
-# listening()
 
 if __name__ == '__main__':
 	try:
 		print('[STARTING]')
 		listening()
 	except KeyboardInterrupt:
-		print('interrupted')
+		print('Interrupted')
+		for client in list(connections.keys()) + connections_temp:
+			remove_client(client)
 		server.close()
+		os.kill(os.getpid(), signal.SIGINT)
 		sys.exit()
+
+

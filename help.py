@@ -25,6 +25,7 @@ REMOVE = '<REMOVE__>'
 USERS = '<USERS___>'
 MSG_Y = '<MSG_YES_>'
 MSG_N = '<MSG_NOPE>'
+DISCONNECT = '<DISCONN_>'
 
 tags = [NICK, NICK_REQUEST, NICK_ERROR, NICK_REQUEST_REP, NICK_APPROVED, ADD, REMOVE, USERS, MSG_Y, MSG_N]
 len_tag = len(max(tags, key=len))

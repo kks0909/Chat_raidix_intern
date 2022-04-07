@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import socket
 import sys
 import threading
@@ -131,11 +130,13 @@ def welcome(conn):
 		msg = conn.recv(MAX_LEN).decode(FORMAT)
 		print(msg)
 		header = msg[:len_header]
-		if header not in headers:
+		if header != SERVICE:
 			raise Exception
 		else:
-			return msg[len_header:]
-
+			tag = msg[len_header: len_header + len_tag]
+			if tag in [NICK, NICK_ERROR]:
+				return tag, msg[len_header + len_tag:]
+			raise Exception
 
 	nickname = None
 	try:
@@ -143,10 +144,11 @@ def welcome(conn):
 		service_send(NICK_REQUEST, conn)
 		print(f'Запрос ника у {conn.getpeername()}')
 		# TODO: MAX_LEN или не на ник?
-		nickname = receive()
-		while connections.get(nickname) is not None and nickname is not NICK_ERROR:
+		tag, nickname = receive()
+		while connections.get(nickname) is not None:
 			service_send(NICK_REQUEST_REP, conn)
-			nickname = receive()
+			tag, nickname = receive()
+
 		# Подтверждаем присвоение ника
 		service_send(NICK_APPROVED, conn)
 		# Оповещаем всех о новом подключении

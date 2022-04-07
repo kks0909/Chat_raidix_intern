@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-
 import socket
 import threading
 from math import floor
 from help import *
-
 
 
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -25,7 +23,7 @@ def send():
 		elif text == 'Users':
 			# Todo: Запросить у сервера список пользователей
 			pass
-		elif text in service_commands:
+		elif text in service_tags:
 			print('Вы не можете отправить такое сообщение')
 		elif text in users:
 			destination = text
@@ -80,14 +78,14 @@ def receive():
 			# Начинается с системного сообщения
 			if header == SERVICE:
 				# Смотрим, что следует за SERVICE
-				reason = msg[len_header_b: len_header_b + len_command_b].decode(FORMAT)
+				reason = msg[len_header_b: len_header_b + len_tag_b].decode(FORMAT)
 				print('Reason'+reason)
 				if reason == ADD:
-					new_user = msg[len_header_b + len_command_b:].decode(FORMAT)
+					new_user = msg[len_header_b + len_tag_b:].decode(FORMAT)
 					users.append(new_user)
 					print(f'Новый клиент подключился: {new_user}')
 				elif reason == REMOVE:
-					rem_user = msg[len_header_b + len_command_b:].decode(FORMAT)
+					rem_user = msg[len_header_b + len_tag_b:].decode(FORMAT)
 					users.remove(rem_user)
 					print(f'Клиент отключился: {rem_user}')
 				elif reason == USERS:
@@ -136,7 +134,7 @@ def receive():
 
 def get_users(msg):
 	print(f'Получаем список пользователей...')
-	users_raw = msg[len_header_b + len_command_b:]
+	users_raw = msg[len_header_b + len_tag_b:]
 	users_raw = users_raw.split(SEP)
 	global users
 	for user_raw in users_raw:
@@ -148,11 +146,11 @@ def get_users(msg):
 		print(f'Подключенные клиенты: {", ".join(users)}')
 
 
-def service_send(msg):
+def service_send(tag, *msg):
 	"""
 	Заведомо меньше лимита
 	"""
-	client.send(f'{SERVICE}{msg}'.encode(FORMAT))
+	client.send(f'{SERVICE}{tag}{"".join(msg)}'.encode(FORMAT))
 
 
 def welcome():
@@ -171,13 +169,13 @@ def welcome():
 			print(header)
 			if header == SERVICE:
 				# Смотрим, что следует за SERVICE
-				reason = msg[len_header: len_header + len_command]
+				reason = msg[len_header: len_header + len_tag]
 				print(reason)
 				if reason == NICK_REQUEST:
 					nickname = input(f'Введите свой псевдоним (не больше {floor(max_nickname_b / len("A".encode(FORMAT)))} символов): ')
 					nickname_b = len(nickname.encode(FORMAT))
 					if nickname_b <= max_nickname_b:
-						service_send(nickname)
+						service_send(NICK, nickname)
 						# client.send(nickname_b)
 					else:
 						service_send(NICK_ERROR)
@@ -185,7 +183,7 @@ def welcome():
 				elif reason == NICK_REQUEST_REP:
 					print('Либо такой псевдоним уже существует, либо Вы превысили лимит\n')
 					nickname = input('Введите другой: ')
-					service_send(nickname)
+					service_send(NICK, nickname)
 					# client.send(nickname.encode(FORMAT))
 				elif reason == NICK_APPROVED:
 					print(f'Вы подключились к серверу как {nickname}')

@@ -14,6 +14,7 @@ len_header_b = len_header * len('A'.encode(FORMAT))
 
 
 # Теги, которые могут следовать за заголовком SERVICE
+NICK = '<NICKNAME___>'
 NICK_REQUEST = '<NICK_REQ___>'
 NICK_ERROR = '<NICK_ERROR_>'
 NICK_REQUEST_REP = '<NICK_AGAIN_>'
@@ -21,9 +22,9 @@ NICK_APPROVED = '<NICK_ACCEPT>'
 ADD = '<ADD________>'
 REMOVE = '<REMOVE_____>'
 USERS = '<USERS______>'
-service_commands = [NICK_REQUEST, NICK_ERROR, NICK_REQUEST_REP, NICK_APPROVED, ADD, REMOVE, USERS]
-len_command = len(max(service_commands, key=len))
-len_command_b = len_command * len('A'.encode(FORMAT))
+service_tags = [NICK, NICK_REQUEST, NICK_ERROR, NICK_REQUEST_REP, NICK_APPROVED, ADD, REMOVE, USERS]
+len_tag = len(max(service_tags, key=len))
+len_tag_b = len_tag * len('A'.encode(FORMAT))
 
 
 # Передается в тексте а не в тегах

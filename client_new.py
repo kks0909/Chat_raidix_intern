@@ -24,21 +24,20 @@ def send():
 			# Todo: показать справку
 			pass
 		elif text == 'Users':
-			# Todo: Запросить у сервера список пользователей
 			client.send(f'{SERVICE}{USERS}'.encode(FORMAT))
 		elif text in tags:
 			print('Вы не можете отправить такое сообщение')
 		elif text in users:
 			destination = text
 			text_en = input('Введите сообщение\n').encode(FORMAT)
-			service_prefix = f'{MSG_tag}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}'.encode(FORMAT)
+			service_prefix = f'{MSG}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}'.encode(FORMAT)
 			if len(text_en) < MAX_LEN - len(service_prefix):
 				if client.send(service_prefix + text_en) == len(service_prefix) + len(text_en):
 					print('Сообщение отправлено')
 				else:
 					print('Ошибка при отправке сообщения')
 			else:
-				send_smth_big(f'{MSG_BIG_tag}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}', text_en)
+				send_smth_big(f'{MSG_BIG}{destination}{SEP}{nickname}{SEP}{len(text_en)}{SEP}', text_en)
 		else:
 			print('Такого пользователя или команды не существует.')
 
@@ -90,21 +89,29 @@ def receive():
 				elif tag == DISCONNECT:
 					print('Вы были отключены')
 					shutdown()
+				elif tag == MSG_CONTROL:
+					# TODO: потеря сообщения не обрабатывается
+					msg = msg.decode(FORMAT)
+					flag, len_text_b = msg[len_header + len_tag:].split(SEP)[1:]
+					if flag == MSG_Y:
+						print('Ваше сообщение доставлено')
+					elif flag == MSG_N:
+						print('Ваше сообщение частично не доставлено')
 				else:
 					print(f'Получено сообщение с пометкой системное, не удалось обработать:\n{msg}')
 			# Имеет хедер сообщения
-			elif header == MSG_tag:
-				# Структура сообщения: <MSG>dest_addr<SEP>sender_addr<SEP>len_text_b<SEP>text
+			elif header == MSG:
+				# Структура сообщения: <MSG>dest_nick<SEP>sender_nick<SEP>len_text_b<SEP>text
 				msg = msg.decode(FORMAT)
 				destination, sender, len_text_b, text = msg[len_header:].split(SEP, 3)
 				if len(text.encode(FORMAT)) == int(len_text_b):
 					print(f'Получено сообщение от {sender}:\n{text}')
-					client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_Y}{SEP}{len_text_b}'.encode(FORMAT))
+					client.send(f'{SERVICE}{MSG_CONTROL}{sender}{SEP}{MSG_Y}{SEP}{len_text_b}'.encode(FORMAT))
 				else:
 					print(f'Получено битое сообщение от {sender}. Попытка расшифровать:\n{text}')
-					client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
-			elif header == MSG_BIG_tag:
-				# Структура сообщения: <MSG_BIG_tag>dest_addr<SEP>sender_addr<SEP>text_part
+					client.send(f'{SERVICE}{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
+			elif header == MSG_BIG:
+				# Структура сообщения: <MSG_BIG_tag>dest_nick<SEP>sender_nick<SEP>text_part
 				destination, sender, len_text_b, text_en = msg[len_header_b:].split(SEP.encode(FORMAT), 3)
 				destination, sender, len_text_b = [item.decode(FORMAT) for item in [destination, sender, len_text_b]]
 				while True:
@@ -118,25 +125,15 @@ def receive():
 							text_en += new_text_en[:-len(MSG_BIG_END_flag)]
 							if len(text_en) == int(len_text_b):
 								print(f'Получено большое сообщение от {sender}:\n{text_en.decode(FORMAT)}')
-								client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_Y}{SEP}{len_text_b}'.encode(FORMAT))
+								client.send(f'{SERVICE}{MSG_CONTROL}{sender}{SEP}{MSG_Y}{SEP}{len_text_b}'.encode(FORMAT))
 							else:
 								print(f'Получено битое сообщение от {sender}.\n {len(text_en)}{len_text_b}')
-								client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
+								client.send(f'{SERVICE}{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
 							break
 					else:
 						print(f'Не получено большое сообщение от {sender}.')
-						client.send(f'{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
+						client.send(f'{SERVICE}{MSG_CONTROL}{sender}{SEP}{MSG_N}{SEP}{len_text_b}'.encode(FORMAT))
 						break
-
-				# TODO: потеря сообщения не обрабатывается
-			elif header == MSG_CONTROL:
-				msg = msg.decode(FORMAT)
-				tag, len_text_b = msg[len_header:].split(SEP)[1:]
-				if tag == MSG_Y:
-					print('Ваше сообщение доставлено')
-				elif tag == MSG_N:
-					print('Ваше сообщение частично не доставлено')
-
 			else:
 				print(f'Получено что-то странное: {msg}')
 				raise Exception

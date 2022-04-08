@@ -5,11 +5,11 @@ PORT = 5050
 FORMAT = 'UTF-8'
 
 # Хедеры: с чего может начинаться сообщение
-MSG_tag = '<MSG_____>'
-MSG_BIG_tag = '<MSGBIG__>'
+MSG = '<MSG_____>'
+MSG_BIG = '<MSGBIG__>'
 SERVICE = '<SERVICE_>'
 MSG_CONTROL = '<MSGCONTR>'
-headers = [MSG_tag, MSG_BIG_tag, SERVICE, MSG_CONTROL]
+headers = [MSG, MSG_BIG, SERVICE, MSG_CONTROL]
 len_header = len(max(headers, key=len))
 len_header_b = len_header * len('A'.encode(FORMAT))
 

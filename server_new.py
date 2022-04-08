@@ -92,7 +92,7 @@ def handle_client(nickname):
 			# Расшифровываем только длину байт, отведенную под тег
 			header = msg[:len_header_b].decode(FORMAT)
 			print(f'REason: {header}')
-			if header in [MSG_tag, MSG_BIG_tag, MSG_CONTROL]:
+			if header in [MSG, MSG_BIG]:
 				destination_client = msg[len_header_b: msg.find(SEP.encode(FORMAT))].decode(FORMAT)
 				print(destination_client)
 				send(msg, destination_client)
@@ -103,6 +103,10 @@ def handle_client(nickname):
 					pass
 				elif tag == USERS:
 					send_connected_users(nickname)
+				elif tag == MSG_CONTROL:
+					destination_client = msg[len_header_b + len_tag_b: msg.find(SEP.encode(FORMAT))].decode(FORMAT)
+					print(destination_client)
+					send(msg, destination_client)
 				else:
 					raise Exception
 			else:

@@ -158,9 +158,9 @@ def welcome():
 	Вызывается только при подключении.
 	Завершается при задании псевдонима и получения списка уже подключенных пользователей.
 	"""
-	def check(nick):
-		if len(nick.encode(FORMAT)) <= max_nickname_b:
-			client.send(MSG().set(SERVICE, tag=NICK, nick=nick))
+	def check(nick_input):
+		if len(nick_input.encode(FORMAT)) <= max_nickname_b:
+			client.send(MSG().set(SERVICE, tag=NICK, nick=nick_input))
 		else:
 			client.send(MSG().set(SERVICE, tag=NICK_ERROR))
 
@@ -171,14 +171,14 @@ def welcome():
 			msg = MSG().get(client.recv(MAX_LEN))
 			if msg.header == SERVICE:
 				if msg.tag == NICK_REQUEST:
-					nick = input(f'Введите свой псевдоним (не больше {max_nickname_b // len("A".encode(FORMAT))} символов): ')
-					check(nick)
+					nick_input = input(f'Введите свой псевдоним (не больше {max_nickname_b // len("A".encode(FORMAT))} символов): ')
+					check(nick_input)
 				elif msg.tag == NICK_REQUEST_REP:
 					print('Либо такой псевдоним уже существует, либо Вы превысили лимит\n')
-					nick = input('Введите другой: ')
-					check(nick)
+					nick_input = input('Введите другой: ')
+					check(nick_input)
 				elif msg.tag == NICK_APPROVED:
-					nickname = nick
+					nickname = nick_input
 					print(f'Вы подключились к серверу как {nickname}')
 				elif msg.tag == USERS:
 					get_users(msg)

@@ -117,7 +117,6 @@ def receive():
 								print(f'Получено битое сообщение от {msg.sender}.\n Получено {len(text_en)} из {msg.len_text_b} байт.')
 								client.send(MSG().set(SERVICE, tag=MSG_CONTROL, dest=msg.sender, flag=MSG_N, len_b=msg.len_text_b))
 							break
-						print('q')
 					else:
 						print(f'Не получено большое сообщение от {msg.sender}.')
 						client.send(MSG().set(SERVICE, tag=MSG_CONTROL, dest=msg.sender, flag=MSG_N, len_b=msg.len_text_b))

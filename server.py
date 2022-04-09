@@ -3,8 +3,8 @@ import os
 import signal
 import socket
 import sys
-import threading
 import syslog
+import threading
 
 from help import *
 
@@ -91,6 +91,7 @@ def handle_client(nickname):
 			msg = MSG().get(raw_msg)
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
 				# Вычленяется адрес назначения, отправляется по назначению
+				syslog.syslog(syslog.LOG_INFO, msg.text_en)
 				send(msg.destination, raw_msg)
 			elif msg.header == SERVICE:
 				if msg.tag == USERS:

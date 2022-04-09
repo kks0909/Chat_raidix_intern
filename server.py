@@ -90,10 +90,12 @@ def handle_client(nickname):
 			print(raw_msg)
 			print(msg.header)
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
+				print('q')
 				# Вычленяется адрес назначения, отправляется по назначению
 				syslog.syslog(syslog.LOG_INFO, msg.text_en)
 				send(msg.destination, raw_msg)
 			elif msg.header == SERVICE:
+				print('qq')
 				if msg.tag == USERS:
 					# Ответ на запрос списка подключенных пользователей
 					send_connected_users(nickname)
@@ -101,6 +103,7 @@ def handle_client(nickname):
 					# Подтверждение получения письма
 					send(msg.destination, raw_msg)
 				else:
+					print('qqq')
 					raise Exception
 			else:
 				raise Exception

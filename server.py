@@ -4,6 +4,7 @@ import signal
 import socket
 import sys
 import threading
+import syslog
 
 from help import *
 
@@ -51,7 +52,7 @@ def broadcast(reason, caused_client_nickname, text):
 		if nickname is not caused_client_nickname:
 			try:
 				service_send(reason, nickname, text)
-				print('Посылка бродкаста.')
+				print(f'[BROADCAST] {reason} {nickname}')
 			except:
 				remove_client(nickname)
 
@@ -62,11 +63,11 @@ def service_send(reason, destination_client, *info):
 	Используются для всего, что не является сообщением от одного пользователя другому.
 	Например: подключение/удаление пользователя, отправка списка пользователей, подтверждение получения/не получения.
 	"""
-	print('Отправка сервисного сообщения.')
+	print('[SERVICE SEND]')
 	if destination_client in connections:
 		destination_client = connections.get(destination_client)
 	elif type(destination_client) is not socket.socket:
-		print('Ошибка при задании назначения сервисного сообщения.')
+		print('[ERROR] Ошибка при задании назначения сервисного сообщения.')
 
 	# Отправляемое сообщение
 	msg = MSG().set(SERVICE, tag=reason, nick="".join(info))
@@ -83,7 +84,6 @@ def handle_client(nickname):
 		connections.get(nickname).send(raw_msg)
 
 	client = connections.get(nickname)
-	print('Обслуживаем клиента')
 	print(f'[ACTIVE CONNECTIONS] {threading.active_count() - 1}; {threading.current_thread()}\n')
 	while True:
 		try:
@@ -91,7 +91,6 @@ def handle_client(nickname):
 			msg = MSG().get(raw_msg)
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
 				# Вычленяется адрес назначения, отправляется по назначению
-				print(msg.destination)
 				send(msg.destination, raw_msg)
 			elif msg.header == SERVICE:
 				if msg.tag == USERS:
@@ -99,21 +98,20 @@ def handle_client(nickname):
 					send_connected_users(nickname)
 				elif msg.tag == MSG_CONTROL:
 					# Подтверждение получения письма
-					print(msg.destination)
 					send(msg.destination, raw_msg)
 				else:
 					raise Exception
 			else:
 				raise Exception
 		except:
-			print(f'Ошибка при обслуживании пользователя {nickname}.')
+			print(f'[ERROR] Ошибка при обслуживании пользователя {nickname}.')
 			remove_client(nickname)
 			break
 	client.close()
 
 
 def send_connected_users(nickname):
-	print('Отправка подключенных пользователей.')
+	print('[SERVICE] Отправка подключенных пользователей.')
 	service_send(USERS, nickname, f'{SEP}'.join(connections))
 
 
@@ -128,7 +126,6 @@ def welcome(conn):
 		msg = MSG().get(conn.recv(MAX_LEN))
 		if msg.header == SERVICE:
 			if msg.tag == NICK and all([nickname, connections.get(nickname)]) is not None:
-				print(msg.data)
 				return msg.data
 			elif msg.tag == NICK_ERROR:
 				service_send(NICK_REQUEST_REP, conn)
@@ -140,24 +137,24 @@ def welcome(conn):
 	try:
 		# Добиваемся от пользователя псевдонима да так, чтоб он был уникальным
 		service_send(NICK_REQUEST, conn)
-		print(f'Запрос ника у {conn.getpeername()}')
+		print(f'[SERVICE] Запрос ника у {conn.getpeername()}')
 		nickname = receive_nick()
 		# Подтверждаем присвоение ника
 		service_send(NICK_APPROVED, conn)
 		# Оповещаем всех о новом подключении
 		print(f'[NEW CONNECTION] {conn.getpeername()} connected as {nickname}')
+		print(f'[SERVICE] Подключенные пользователи: {", ".join(connections)}')
 		broadcast(ADD, nickname, nickname)
 
 		# Посылаем уже подключенных к серверу пользователей
 		send_connected_users(conn)
 
 		connections.update({nickname: conn})
-		print(f'Подключенные пользователи: {", ".join(connections)}')
 		connections_temp.remove(conn)
 
 		handle_client(nickname)
 	except:
-		print(f'Ошибка во время подключения {conn.getpeername()}')
+		print(f'[SERVICE] Ошибка во время подключения {conn.getpeername()}')
 		print(f'[DELETE CONNECTION] {conn.getpeername()} {nickname}')
 		if connections.get(nickname) is not None:
 			remove_client(nickname)
@@ -184,7 +181,7 @@ if __name__ == '__main__':
 		print('[STARTING]')
 		listening()
 	except KeyboardInterrupt:
-		print('Interrupted')
+		print('[INTERRUPTED]')
 		for client in list(connections.keys()) + connections_temp:
 			remove_client(client)
 		server.close()

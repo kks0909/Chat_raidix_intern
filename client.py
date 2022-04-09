@@ -21,7 +21,8 @@ def send():
 	Цикл для чтения информации вводимой пользователем и ее отправки.
 	"""
 	while True:
-		text = input('Введите команду "Users" или адресата:\n')
+		show_info_text()
+		text = input()
 		if text == 'Users':
 			client.send(MSG().set(SERVICE, tag=USERS))
 		elif text in [headers, tags, flags]:
@@ -43,7 +44,6 @@ def send():
 				send_smth_big(destination, len_prefix, input_text_en + MSG_BIG_END_flag.encode(FORMAT))
 		else:
 			print('Такого пользователя или команды не существует.')
-		show_info_text()
 
 
 def send_smth_big(destination: str, len_prefix: int, text_en: bytes):
@@ -150,7 +150,7 @@ def get_users(msg):
 
 
 def show_info_text():
-	print('\nВведите команду или адресата:')
+	print('\nВведите команду "Users" или адресата:\n')
 
 
 def welcome():
@@ -211,7 +211,7 @@ def start():
 		write_thread = threading.Thread(target=send)
 		write_thread.start()
 	except:
-		print('Все плохо')
+		print('Все упало')
 		shutdown()
 
 

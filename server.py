@@ -18,6 +18,7 @@ server.bind(ADDR)
 connections = {}
 connections_temp = []
 
+text_big_en = b''
 
 def remove_client(nickname):
 	"""
@@ -81,6 +82,7 @@ def handle_client(nickname):
 	def send(nickname, raw_msg):
 		connections.get(nickname).send(raw_msg)
 
+	global text_big_en
 	client = connections.get(nickname)
 	print(f'[ACTIVE CONNECTIONS] {threading.active_count() - 1}; {threading.current_thread()}\n')
 	while True:
@@ -91,8 +93,15 @@ def handle_client(nickname):
 			print(msg.header)
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
 				print('q')
+				# В зависимости от типа сообщения разная логика логирования
+				if msg.header == MSG_BIG:
+					text_big_en += msg.text_en
+					if msg.flag == MSG_BIG_END_flag:
+						syslog.syslog(syslog.LOG_INFO, text_big_en.decode(FORMAT))
+						text_big_en = b''
+				elif msg.header == MSG_NORMAL:
+					syslog.syslog(syslog.LOG_INFO, msg.text_en.decode(FORMAT))
 				# Вычленяется адрес назначения, отправляется по назначению
-				syslog.syslog(syslog.LOG_INFO, msg.text_en.decode(FORMAT))
 				send(msg.destination, raw_msg)
 			elif msg.header == SERVICE:
 				print('qq')

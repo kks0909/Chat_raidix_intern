@@ -40,22 +40,23 @@ def remove_client(nickname):
 	# f'{nickname}' отключилсяя
 
 
-def broadcast(reason, caused_client_nickname, *info):
+def broadcast(reason, caused_client_nickname, text):
 	# Посылаем всем, кроме клиента, совершившего действие
-	for nickname, client in connections.items():
+	for nickname in connections:
 		if nickname is not caused_client_nickname:
 			try:
-				service_send(reason, nickname, *info)
+				service_send(reason, nickname, text)
 				print('Посылка бродкаста')
 			except:
 				remove_client(nickname)
 
 
-def send(msg, destination_client):
+def send(nickname, raw_msg):
 	#Todo: подтверждение получения
-	if type(msg) is not bytes:
-		msg = msg.encode(FORMAT)
-	connections.get(destination_client).send(msg)
+
+	# if type(msg) is not bytes:
+	# 	msg = msg.encode(FORMAT)
+	connections.get(nickname).send(raw_msg)
 
 
 def service_send(reason, destination_client, *info):
@@ -66,88 +67,61 @@ def service_send(reason, destination_client, *info):
 		print('Куда, блять, отправлять?')
 
 	# Отправляемое сообщение
-	msg = f'{SERVICE}{reason}{"".join(info)}'.encode(FORMAT)
-	if len(msg) < MAX_LEN:
-		# В большинстве случаев для сервисных сообщений хватит стандартного ограничения длины
-		if destination_client.sendall(msg) is not None:
-			# Если произошла ошибка при отправке или отправилось не все, то повторить отправку
-			service_send(reason, destination_client, *info)
-	else:
-		print('Отправка большого')
-		if destination_client.sendall(msg) is not None:
-			# Если произошла ошибка при отправке или отправилось не все, то повторить отправку
-			service_send(reason, destination_client, *info)
+	msg = MSG().set(SERVICE, tag=reason, nick="".join(info))
+	# msg = f'{SERVICE}{reason}{"".join(info)}'.encode(FORMAT)
+	if destination_client.send(msg) != len(msg):
+		# Если произошла ошибка при отправке или отправилось не все, то повторить отправку
+		service_send(reason, destination_client, *info)
 
 
 def handle_client(nickname):
 	client = connections.get(nickname)
 	print('Обслуживаем клиента')
-	print(f'[ACTIVE CONNECTIONS_2] {threading.active_count() - 2}; {threading.current_thread()}\n')
+	print(f'[ACTIVE CONNECTIONS] {threading.active_count() - 1}; {threading.current_thread()}\n')
 	# send_connected_users(nickname)
 	while True:
 		try:
-			# Структура: <MSG_BIG_tag>dest_addr<SEP>sender_addr<SEP>text_part
-			msg = client.recv(MAX_LEN)
-			print(f'MSG: {msg}')
-			# Расшифровываем только длину байт, отведенную под тег
-			header = msg[:len_header_b].decode(FORMAT)
-			print(f'REason: {header}')
-			if header in [MSG, MSG_BIG]:
-				destination_client = msg[len_header_b: msg.find(SEP.encode(FORMAT))].decode(FORMAT)
-				print(destination_client)
-				send(msg, destination_client)
-			elif header == SERVICE:
-				tag = msg[len_header_b: len_header_b + len_tag_b].decode(FORMAT)
-				if tag == 'help':
+			raw_msg = client.recv(MAX_LEN)
+			msg = MSG().get(raw_msg)
+			if msg.header in [MSG_NORMAL, MSG_BIG]:
+				print(msg.destination)
+				send(msg.destination, raw_msg)
+			elif msg.header == SERVICE:
+				if msg.tag == 'help':
 					# Todo: блок help
 					pass
-				elif tag == USERS:
+				elif msg.tag == USERS:
 					send_connected_users(nickname)
-				elif tag == MSG_CONTROL:
-					destination_client = msg[len_header_b + len_tag_b: msg.find(SEP.encode(FORMAT))].decode(FORMAT)
-					print(destination_client)
-					send(msg, destination_client)
+				elif msg.tag == MSG_CONTROL:
+					print(msg.destination)
+					send(msg.destination, raw_msg)
 				else:
 					raise Exception
 			else:
 				raise Exception
 		except:
-			print(f'Сервер получил что-то странное от пользователя {nickname}: {msg.decode(FORMAT)}')
+			print(f'Ошибка при обслуживании пользователя {nickname}.')
 			remove_client(nickname)
 			break
 	client.close()
 
 
 def send_connected_users(nickname):
-	print('по')
+	print('Подключенные юзеры')
 	service_send(USERS, nickname, f'{SEP}'.join(connections))
 
 
-def receive_msg(client):
-	try:
-		msg = client.recv(MAX_LEN)
-		header = msg[: len_header_b].decode(FORMAT)
-		if header in headers:
-			return header, msg[len_header_b:],
-		else:
-			print(f'Ошибка во время получения')
-			client.close()
-	except:
-		print(f'Ошибка во время получения')
-		client.close()
-
-
 def welcome(conn):
-	def receive():
-		msg = conn.recv(MAX_LEN).decode(FORMAT)
-		print(msg)
-		header = msg[:len_header]
-		if header != SERVICE:
-			raise Exception
+	def receive_nick():
+		msg = MSG().get(conn.recv(MAX_LEN))
+		if msg.header == SERVICE:
+			if msg.tag == NICK and all([nickname, connections.get(nickname)]) is not None:
+				print(msg.data)
+				return msg.data
+			elif msg.tag == NICK_ERROR:
+				service_send(NICK_REQUEST_REP, conn)
+				return receive_nick()
 		else:
-			tag = msg[len_header: len_header + len_tag]
-			if tag in [NICK, NICK_ERROR]:
-				return tag, msg[len_header + len_tag:]
 			raise Exception
 
 	nickname = None
@@ -155,11 +129,7 @@ def welcome(conn):
 		# Добиваемся от пользователя псевдонима да так, чтоб он был уникальным
 		service_send(NICK_REQUEST, conn)
 		print(f'Запрос ника у {conn.getpeername()}')
-		tag, nickname = receive()
-		while connections.get(nickname) is not None:
-			service_send(NICK_REQUEST_REP, conn)
-			tag, nickname = receive()
-
+		nickname = receive_nick()
 		# Подтверждаем присвоение ника
 		service_send(NICK_APPROVED, conn)
 		# Оповещаем всех о новом подключении

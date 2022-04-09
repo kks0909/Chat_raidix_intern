@@ -150,7 +150,7 @@ def get_users(msg):
 
 
 def show_info_text():
-	print('\nВведите команду "Users" или адресата:\n')
+	print('\nВведите команду "Users" или адресата:')
 
 
 def welcome():

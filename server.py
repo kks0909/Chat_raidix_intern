@@ -88,6 +88,7 @@ def handle_client(nickname):
 			raw_msg = client.recv(MAX_LEN)
 			msg = MSG().get(raw_msg)
 			print(raw_msg)
+			print(msg.header)
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
 				# Вычленяется адрес назначения, отправляется по назначению
 				syslog.syslog(syslog.LOG_INFO, msg.text_en)

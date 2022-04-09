@@ -8,8 +8,6 @@ import threading
 
 from help import *
 
-# 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
-
 
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)

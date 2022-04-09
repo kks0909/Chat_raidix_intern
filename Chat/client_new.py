@@ -17,12 +17,12 @@ nickname = ''
 
 
 def send():
+	"""
+	Цикл для чтения информации вводимой пользователем и ее отправки.
+	"""
 	while True:
-		text = input('Введите команду или адресата:\n')
-		if text == 'Help':
-			# Todo: показать справку
-			pass
-		elif text == 'Users':
+		text = input('Введите команду "Users" или адресата:\n')
+		if text == 'Users':
 			client.send(MSG().set(SERVICE, tag=USERS))
 		elif text in [headers, tags, flags]:
 			print('Вы не можете отправить такое сообщение.')
@@ -49,7 +49,7 @@ def send():
 def send_smth_big(destination: str, len_prefix: int, text_en: bytes):
 	"""
 	Если требуется отправить что-то большое, что не влезает в стандартный лимит.
-	Считаем, сколько информации можно отправить, создаем генератор для отправки кусочков
+	Считаем, сколько информации можно отправить, создаем генератор для отправки кусочков.
 	"""
 	print('Отправляем что-то большое')
 	bytes_send = 0
@@ -67,7 +67,8 @@ def send_smth_big(destination: str, len_prefix: int, text_en: bytes):
 
 def receive():
 	"""
-	Основная часть приема сообщений
+	Прием входящих сообщений.
+	Читаем, анализиреум хедер.
 	"""
 	while True:
 		try:
@@ -85,7 +86,7 @@ def receive():
 					print('Вы были отключены')
 					shutdown()
 				elif msg.tag == MSG_CONTROL:
-					# TODO: потеря сообщения не обрабатывается
+					# Прием оповещений о доставке/не доставке.
 					if msg.flag == MSG_Y:
 						print('Ваше сообщение доставлено')
 					elif msg.flag == MSG_N:
@@ -93,6 +94,7 @@ def receive():
 				else:
 					print(f'Получено сообщение с пометкой системное, не удалось обработать:\n{msg.tag}{msg.data}')
 			elif msg.header == MSG_NORMAL:
+				# Прием обычных сообщений
 				if len(msg.text_en) == msg.len_text_b:
 					print(f'Получено сообщение от {msg.sender}:\n{msg.text_en.decode(FORMAT)}')
 					client.send(MSG().set(SERVICE, tag=MSG_CONTROL, dest=msg.sender, flag=MSG_Y, len_b=msg.len_text_b))
@@ -100,6 +102,8 @@ def receive():
 					print(f'Получено битое сообщение от {msg.sender}. Попытка расшифровать:\n{msg.text_en.decode(FORMAT)}')
 					client.send(MSG().set(SERVICE, tag=MSG_CONTROL, dest=msg.sender, flag=MSG_N, len_b=msg.len_text_b))
 			elif msg.header == MSG_BIG:
+				# Прием изначально большого сообщения, разбитого на части.
+				# Так как передаются байты, надо получить все исходное сообщение, а затем его декодировать.
 				text_en = msg.text_en
 				while True:
 					new_msg = MSG().get(client.recv(MAX_LEN))
@@ -129,27 +133,24 @@ def receive():
 
 
 def get_users(msg):
+	"""
+	Получение списка подключенных пользователей.
+	"""
 	print('Получаем список пользователей...')
 	users_raw = msg.data.split(SEP)
 	global users
 	for user_raw in users_raw:
-		if user_raw not in users and user_raw != '':
+		if user_raw not in users and user_raw != '' and user_raw != nickname:
 			users.append(user_raw)
 	if len(users) == 0:
 		print('Вы единственное подключение')
 	else:
 		print(f'Подключенные клиенты: {", ".join(users)}')
-
-
-def service_send(tag, *msg):
-	"""
-	Заведомо меньше лимита
-	"""
-	client.send(f'{SERVICE}{tag}{"".join(msg)}'.encode(FORMAT))
+		print(f'Вы подключены как: {nickname}')
 
 
 def show_info_text():
-	print('Введите команду или адресата:\n')
+	print('\nВведите команду или адресата:')
 
 
 def welcome():
@@ -159,9 +160,9 @@ def welcome():
 	"""
 	def check(nick):
 		if len(nick.encode(FORMAT)) <= max_nickname_b:
-			service_send(NICK, nick)
+			client.send(MSG().set(SERVICE, tag=NICK, nick=nick))
 		else:
-			service_send(NICK_ERROR)
+			client.send(MSG().set(SERVICE, tag=NICK_ERROR))
 
 	global nickname
 	
@@ -176,7 +177,6 @@ def welcome():
 					print('Либо такой псевдоним уже существует, либо Вы превысили лимит\n')
 					nick = input('Введите другой: ')
 					check(nick)
-					# client.send(MSG().set(SERVICE, tag=NICK, nick=nickname))
 				elif msg.tag == NICK_APPROVED:
 					nickname = nick
 					print(f'Вы подключились к серверу как {nickname}')
@@ -196,6 +196,10 @@ def shutdown():
 
 
 def start():
+	"""
+	Сначала запускается поток для представления пользователем.
+	После завершения его работы (в случае принятия псевдонима) запускаются параллельные потоки приняти и отправки сообщений.
+	"""
 	try:
 		welcome_thread = threading.Thread(target=welcome)
 		welcome_thread.start()

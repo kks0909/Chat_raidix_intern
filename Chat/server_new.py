@@ -21,6 +21,10 @@ connections_temp = []
 
 
 def remove_client(nickname):
+	"""
+	Оповещение подключенных клиентов об отключении клиента (посылка сообщения с тегом DISCONNECT).
+	Удаление клиента.
+	"""
 	if nickname in connections:
 		print(f'[DELETE CONNECTION] {connections.get(nickname).getpeername()} {nickname}')
 		try:
@@ -37,62 +41,64 @@ def remove_client(nickname):
 			nickname.close()
 			connections_temp.remove(nickname)
 
-	# f'{nickname}' отключилсяя
-
 
 def broadcast(reason, caused_client_nickname, text):
-	# Посылаем всем, кроме клиента, совершившего действие
+	"""
+	Оповещение всех подключенных клиентов, за исключением клиента, совершившего действие.
+	Событие: отключение, добавление.
+	"""
 	for nickname in connections:
 		if nickname is not caused_client_nickname:
 			try:
 				service_send(reason, nickname, text)
-				print('Посылка бродкаста')
+				print('Посылка бродкаста.')
 			except:
 				remove_client(nickname)
 
 
-def send(nickname, raw_msg):
-	#Todo: подтверждение получения
-
-	# if type(msg) is not bytes:
-	# 	msg = msg.encode(FORMAT)
-	connections.get(nickname).send(raw_msg)
-
-
 def service_send(reason, destination_client, *info):
-	print('СЕРВИС')
+	"""
+	Отправка сообщений с пометкой сервисных.
+	Используются для всего, что не является сообщением от одного пользователя другому.
+	Например: подключение/удаление пользователя, отправка списка пользователей, подтверждение получения/не получения.
+	"""
+	print('Отправка сервисного сообщения.')
 	if destination_client in connections:
 		destination_client = connections.get(destination_client)
 	elif type(destination_client) is not socket.socket:
-		print('Куда, блять, отправлять?')
+		print('Ошибка при задании назначения сервисного сообщения.')
 
 	# Отправляемое сообщение
 	msg = MSG().set(SERVICE, tag=reason, nick="".join(info))
-	# msg = f'{SERVICE}{reason}{"".join(info)}'.encode(FORMAT)
 	if destination_client.send(msg) != len(msg):
 		# Если произошла ошибка при отправке или отправилось не все, то повторить отправку
 		service_send(reason, destination_client, *info)
 
 
 def handle_client(nickname):
+	"""
+	Основной цикл обслуживания пользователя.
+	"""
+	def send(nickname, raw_msg):
+		connections.get(nickname).send(raw_msg)
+
 	client = connections.get(nickname)
 	print('Обслуживаем клиента')
 	print(f'[ACTIVE CONNECTIONS] {threading.active_count() - 1}; {threading.current_thread()}\n')
-	# send_connected_users(nickname)
 	while True:
 		try:
 			raw_msg = client.recv(MAX_LEN)
 			msg = MSG().get(raw_msg)
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
+				# Вычленяется адрес назначения, отправляется по назначению
 				print(msg.destination)
 				send(msg.destination, raw_msg)
 			elif msg.header == SERVICE:
-				if msg.tag == 'help':
-					# Todo: блок help
-					pass
-				elif msg.tag == USERS:
+				if msg.tag == USERS:
+					# Ответ на запрос списка подключенных пользователей
 					send_connected_users(nickname)
 				elif msg.tag == MSG_CONTROL:
+					# Подтверждение получения письма
 					print(msg.destination)
 					send(msg.destination, raw_msg)
 				else:
@@ -107,11 +113,17 @@ def handle_client(nickname):
 
 
 def send_connected_users(nickname):
-	print('Подключенные юзеры')
+	print('Отправка подключенных пользователей.')
 	service_send(USERS, nickname, f'{SEP}'.join(connections))
 
 
 def welcome(conn):
+	"""
+	Запрос псевдонима у пользователя.
+	При успехе псевдоним добавляется в список подключений.
+	Ново-подключенный пользователь оповещается об уже подключенных пользователях.
+	Остальные подключенные пользователи оповещаются о новом подключении.
+	"""
 	def receive_nick():
 		msg = MSG().get(conn.recv(MAX_LEN))
 		if msg.header == SERVICE:
@@ -154,6 +166,9 @@ def welcome(conn):
 
 
 def listening():
+	"""
+	Сервер постоянно слушает и принимает подключения, запуская отдельный поток.
+	"""
 	server.listen()
 	print(f'[LISTENING] server listening {SERVER}')
 	while True:
@@ -175,5 +190,3 @@ if __name__ == '__main__':
 		server.close()
 		os.kill(os.getpid(), signal.SIGINT)
 		sys.exit()
-
-

@@ -92,7 +92,7 @@ def handle_client(nickname):
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
 				print('q')
 				# Вычленяется адрес назначения, отправляется по назначению
-				syslog.syslog(syslog.LOG_INFO, msg.text_en)
+				syslog.syslog(syslog.LOG_INFO, msg.text_en.decode(FORMAT))
 				send(msg.destination, raw_msg)
 			elif msg.header == SERVICE:
 				print('qq')

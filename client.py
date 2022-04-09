@@ -29,7 +29,7 @@ def send():
 			print('Вы не можете отправить такое сообщение.')
 		elif text in users:
 			destination = text
-			input_text_en = input('Введите сообщение').encode(FORMAT)
+			input_text_en = input('Введите сообщение:\n').encode(FORMAT)
 			len_input_text_en = len(input_text_en)
 			# Предварительно посчитать длину сообщения
 			len_prefix = len(f'{MSG_NORMAL}{destination}{SEP}{nickname}{SEP}{len_input_text_en}{SEP}'.encode(FORMAT))

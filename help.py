@@ -89,13 +89,4 @@ class MSG:
 		elif self.header in [MSG_NORMAL, MSG_BIG]:
 			message += f"{data['dest']}{SEP}{data['sender']}{SEP}{data['len_text_b']}{SEP}"
 			message = message.encode(FORMAT) + data['text_en']
-			# self.len_msg_b = len(message) - len(SEP)
-			# self.len_msg_b += len(str(self.len_msg_b).encode(FORMAT))
-			# message = message.replace(f'{SEP}{SEP}{SEP}'.encode(FORMAT), f'{SEP}{self.len_msg_b}{SEP}'.encode(FORMAT), 1)
-		# elif self.header == MSG_BIG:
-		# 	message += f"{data['dest']}{SEP}{data['sender']}{SEP}{SEP}{SEP}"
-		# 	message = message.encode(FORMAT) + data['text_en']
-		# 	self.len_msg_b = len(message) - len(SEP)
-		# 	self.len_msg_b += len(str(self.len_msg_b).encode(FORMAT))
-		# 	message = message.replace(f'{SEP}{SEP}{SEP}'.encode(FORMAT), f'{SEP}{self.len_msg_b}{SEP}'.encode(FORMAT), 1)
 		return message

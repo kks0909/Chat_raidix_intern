@@ -89,10 +89,7 @@ def handle_client(nickname):
 		try:
 			raw_msg = client.recv(MAX_LEN)
 			msg = MSG().get(raw_msg)
-			print(raw_msg)
-			print(msg.header)
 			if msg.header in [MSG_NORMAL, MSG_BIG]:
-				print('q')
 				# В зависимости от типа сообщения разная логика логирования
 				if msg.header == MSG_BIG:
 					text_big_en += msg.text_en
@@ -104,7 +101,6 @@ def handle_client(nickname):
 				# Вычленяется адрес назначения, отправляется по назначению
 				send(msg.destination, raw_msg)
 			elif msg.header == SERVICE:
-				print('qq')
 				if msg.tag == USERS:
 					# Ответ на запрос списка подключенных пользователей
 					send_connected_users(nickname)
@@ -112,7 +108,6 @@ def handle_client(nickname):
 					# Подтверждение получения письма
 					send(msg.destination, raw_msg)
 				else:
-					print('qqq')
 					raise Exception
 			else:
 				raise Exception
